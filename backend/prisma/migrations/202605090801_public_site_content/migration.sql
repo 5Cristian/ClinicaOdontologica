@@ -1,0 +1,15 @@
+ALTER TABLE "ConfiguracionClinica"
+ADD COLUMN "tituloSitio" TEXT,
+ADD COLUMN "descripcionSitio" TEXT,
+ADD COLUMN "fraseEncabezado" TEXT,
+ADD COLUMN "textoInsigniaHero" TEXT,
+ADD COLUMN "tituloHero" TEXT,
+ADD COLUMN "descripcionHero" TEXT,
+ADD COLUMN "tituloPaginaServicios" TEXT,
+ADD COLUMN "descripcionPaginaServicios" TEXT,
+ADD COLUMN "tituloPaginaReservas" TEXT,
+ADD COLUMN "descripcionPaginaReservas" TEXT,
+ADD COLUMN "tituloPaginaContacto" TEXT,
+ADD COLUMN "descripcionPaginaContacto" TEXT,
+ADD COLUMN "tituloPie" TEXT,
+ADD COLUMN "descripcionPie" TEXT;

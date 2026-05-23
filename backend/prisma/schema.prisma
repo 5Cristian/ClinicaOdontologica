@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolNombre {
+  ADMINISTRADOR
+  RECEPCION
+  ODONTOLOGO
+}
+
+enum EstadoCita {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  ATENDIDA
+  NO_ASISTIO
+}
+
+model Usuario {
+  id                 String               @id @default(cuid())
+  nombre             String
+  correo             String               @unique
+  hashContrasena     String
+  rol                RolNombre
+  activo             Boolean              @default(true)
+  tokensRefresco     TokenRefresco[]
+  registrosAuditoria RegistroAuditoria[]
+  creadoEn           DateTime             @default(now())
+  actualizadoEn      DateTime             @updatedAt
+}
+
+model RegistroAuditoria {
+  id             String    @id @default(cuid())
+  usuarioActorId String?
+  usuarioActor   Usuario?  @relation(fields: [usuarioActorId], references: [id], onDelete: SetNull)
+  accion         String
+  tipoEntidad    String
+  entidadId      String?
+  descripcion    String
+  metadatos      Json?
+  creadoEn       DateTime  @default(now())
+
+  @@index([usuarioActorId])
+  @@index([tipoEntidad])
+  @@index([accion])
+  @@index([creadoEn])
+}
+
+model Paciente {
+  id                String            @id @default(cuid())
+  nombreCompleto    String
+  dpi               String?           @unique
+  fechaNacimiento   DateTime?
+  edad              Int?
+  telefono          String
+  whatsapp          String
+  correo            String?
+  direccion         String?
+  historialMedico   String?
+  alergias          String?
+  observaciones     String?
+  citas             Cita[]
+  registrosClinicos RegistroClinico[]
+  creadoPor         String?
+  actualizadoPor    String?
+  creadoEn          DateTime          @default(now())
+  actualizadoEn     DateTime          @updatedAt
+
+  @@index([nombreCompleto])
+  @@index([telefono])
+}
+
+model Tratamiento {
+  id                 String            @id @default(cuid())
+  nombre             String            @unique
+  slug               String            @unique
+  descripcion        String
+  precioEstimado     Decimal?          @db.Decimal(10, 2)
+  duracionAproximada Int?
+  activo             Boolean           @default(true)
+  citas              Cita[]
+  registrosClinicos  RegistroClinico[]
+  creadoPor          String?
+  actualizadoPor     String?
+  creadoEn           DateTime          @default(now())
+  actualizadoEn      DateTime          @updatedAt
+}
+
+model Cita {
+  id                     String                     @id @default(cuid())
+  pacienteId             String
+  tratamientoId          String
+  paciente               Paciente                   @relation(fields: [pacienteId], references: [id])
+  tratamiento            Tratamiento                @relation(fields: [tratamientoId], references: [id])
+  programadaPara         DateTime
+  estado                 EstadoCita                 @default(PENDIENTE)
+  motivo                 String
+  observaciones          String?
+  origen                 String                     @default("FORMULARIO_PUBLICO")
+  recordatorioEnviado    Boolean                    @default(false)
+  recordatorioEnviadoEn  DateTime?
+  recordatorio           Recordatorio?
+  mensajesWhatsapp       MensajeConversacionWhatsApp[]
+  creadoPor              String?
+  actualizadoPor         String?
+  creadoEn               DateTime                   @default(now())
+  actualizadoEn          DateTime                   @updatedAt
+
+  @@index([programadaPara])
+  @@index([estado])
+}
+
+model MensajeConversacionWhatsApp {
+  id                  String   @id @default(cuid())
+  citaId              String
+  cita                Cita     @relation(fields: [citaId], references: [id], onDelete: Cascade)
+  direccion           String
+  cuerpoMensaje       String
+  proveedor           String?
+  sidMensajeProveedor String?
+  estadoEntrega       String?
+  intencionDetectada  String?
+  enviadoPorUsuarioId String?
+  creadoEn            DateTime @default(now())
+
+  @@index([citaId])
+  @@index([creadoEn])
+}
+
+model RegistroClinico {
+  id                      String       @id @default(cuid())
+  pacienteId              String
+  tratamientoId           String?
+  paciente                Paciente     @relation(fields: [pacienteId], references: [id])
+  tratamiento             Tratamiento? @relation(fields: [tratamientoId], references: [id])
+  diagnostico             String
+  piezaDental             String?
+  medicamentos            String?
+  notas                   String?
+  proximaCitaRecomendada  DateTime?
+  atendidoEn              DateTime     @default(now())
+  creadoPor               String?
+  actualizadoPor          String?
+  creadoEn                DateTime     @default(now())
+  actualizadoEn           DateTime     @updatedAt
+}
+
+model Recordatorio {
+  id                         String   @id @default(cuid())
+  citaId                     String   @unique
+  cita                       Cita     @relation(fields: [citaId], references: [id])
+  canal                      String   @default("WHATSAPP_MANUAL")
+  mensaje                    String
+  proveedor                  String   @default("MANUAL")
+  sidMensajeProveedor        String?
+  estadoEntrega              String?
+  intencionRespuestaPaciente String?
+  ultimoMensajeEntrante      String?
+  recibidoEn                 DateTime?
+  ultimaRespuestaManual      String?
+  ultimaRespuestaManualEn    DateTime?
+  ultimoError                String?
+  enviadoEn                  DateTime?
+  creadoEn                   DateTime @default(now())
+  actualizadoEn              DateTime @updatedAt
+}
+
+model ConfiguracionClinica {
+  id                          String   @id @default(cuid())
+  nombreClinica               String
+  telefono                    String
+  whatsapp                    String
+  direccion                   String?
+  horarioAtencion             String?
+  urlLogo                     String?
+  tituloSitio                 String?
+  descripcionSitio            String?
+  fraseEncabezado             String?
+  textoInsigniaHero           String?
+  tituloHero                  String?
+  descripcionHero             String?
+  tituloPaginaServicios       String?
+  descripcionPaginaServicios  String?
+  tituloPaginaReservas        String?
+  descripcionPaginaReservas   String?
+  tituloPaginaContacto        String?
+  descripcionPaginaContacto   String?
+  tituloPie                   String?
+  descripcionPie              String?
+  urlFacebook                 String?
+  urlInstagram                String?
+  mensajeWhatsappPredeterminado String?
+  creadoPor                   String?
+  actualizadoPor              String?
+  creadoEn                    DateTime @default(now())
+  actualizadoEn               DateTime @updatedAt
+}
+
+model TokenRefresco {
+  id            String   @id @default(cuid())
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  hashToken     String   @unique
+  expiraEn      DateTime
+  revocadoEn    DateTime?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([usuarioId])
+}
