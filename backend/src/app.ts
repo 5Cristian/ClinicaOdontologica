@@ -12,6 +12,11 @@ import routes from "@/routes";
 
 const app = express();
 const isDevelopment = env.NODE_ENV !== "production";
+const allowedOrigins = new Set(
+  [env.FRONTEND_URL, ...(env.FRONTEND_URLS ?? "").split(",")]
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 
 // Oculta la firma de Express en las respuestas HTTP.
 app.disable("x-powered-by");
@@ -26,7 +31,7 @@ app.use(
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || origin === env.FRONTEND_URL) {
+      if (!origin || allowedOrigins.has(origin)) {
         return callback(null, true);
       }
 

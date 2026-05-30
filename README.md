@@ -178,6 +178,12 @@ Frontend disponible en `http://localhost:3000`.
 
 ## Producción
 
+Para desplegar con Supabase y Vercel consulte:
+
+```text
+docs/despliegue-supabase-vercel.md
+```
+
 ### Recomendaciones obligatorias
 
 1. Servir frontend y backend solo por `HTTPS`.

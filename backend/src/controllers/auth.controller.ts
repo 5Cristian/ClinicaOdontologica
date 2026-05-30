@@ -5,13 +5,14 @@ import * as authService from "@/services/auth.service";
 import { successResponse } from "@/utils/api-response";
 
 const REFRESH_COOKIE_NAME = "clinica_refresh_token";
+const isProduction = process.env.NODE_ENV === "production";
 
 function applyRefreshCookie(res: Response, refreshToken: string) {
   // Mantiene el refresh token fuera de JavaScript usando cookie HttpOnly.
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
@@ -20,8 +21,8 @@ function applyRefreshCookie(res: Response, refreshToken: string) {
 function clearRefreshCookie(res: Response) {
   res.clearCookie(REFRESH_COOKIE_NAME, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     path: "/"
   });
 }

@@ -12,6 +12,7 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   PORT: z.coerce.number().default(4000),
   FRONTEND_URL: z.string().url(),
+  FRONTEND_URLS: z.string().optional(),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(8).max(14).default(10),
   APP_BASE_URL: z.string().url().default("http://localhost:4000"),
   WHATSAPP_PROVIDER: z.enum(["MANUAL", "TWILIO", "WHATSAPP_WEB"]).default("MANUAL"),
