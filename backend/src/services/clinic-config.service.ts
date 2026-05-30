@@ -7,6 +7,7 @@ type ConfiguracionClinicaInput = {
   direccion?: string | null;
   horarioAtencion?: string | null;
   urlLogo?: string | null;
+  imagenesNegocio: string[];
   tituloSitio?: string | null;
   descripcionSitio?: string | null;
   fraseEncabezado?: string | null;

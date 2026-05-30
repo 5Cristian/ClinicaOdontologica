@@ -1,6 +1,7 @@
 import { prisma } from "@/config/prisma";
 import { recordRegistroAuditoria } from "@/services/audit-log.service";
 import { AppError } from "@/utils/app-error";
+import { Prisma } from "@prisma/client";
 
 function slugify(value: string) {
   return value
@@ -14,6 +15,7 @@ function slugify(value: string) {
 type TratamientoInput = {
   name: string;
   description: string;
+  imagenes: string[];
   precioEstimado?: number | null;
   duracionAproximada?: number | null;
   activo?: boolean;
@@ -24,6 +26,7 @@ function mapTratamiento(tratamiento: {
   nombre: string;
   slug: string;
   descripcion: string;
+  imagenes: string[];
   precioEstimado: unknown;
   duracionAproximada: number | null;
   activo: boolean;
@@ -37,6 +40,7 @@ function mapTratamiento(tratamiento: {
     name: tratamiento.nombre,
     slug: tratamiento.slug,
     descripcion: tratamiento.descripcion,
+    imagenes: tratamiento.imagenes,
     precioEstimado: tratamiento.precioEstimado,
     duracionAproximada: tratamiento.duracionAproximada,
     activo: tratamiento.activo,
@@ -55,18 +59,28 @@ export async function listTratamientos() {
 }
 
 export async function createTratamiento(input: TratamientoInput, usuarioId?: string) {
-  const tratamiento = await prisma.tratamiento.create({
-    data: {
-      nombre: input.name,
-      descripcion: input.description,
-      slug: slugify(input.name),
-      precioEstimado: input.precioEstimado ?? null,
-      duracionAproximada: input.duracionAproximada ?? null,
-      activo: input.activo ?? true,
-      creadoPor: usuarioId,
-      actualizadoPor: usuarioId
+  let tratamiento;
+  try {
+    tratamiento = await prisma.tratamiento.create({
+      data: {
+        nombre: input.name,
+        descripcion: input.description,
+        imagenes: input.imagenes,
+        slug: slugify(input.name),
+        precioEstimado: input.precioEstimado ?? null,
+        duracionAproximada: input.duracionAproximada ?? null,
+        activo: input.activo ?? true,
+        creadoPor: usuarioId,
+        actualizadoPor: usuarioId
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new AppError("Ya existe un tratamiento con ese nombre.", 409);
     }
-  });
+
+    throw error;
+  }
 
   await recordRegistroAuditoria({
     usuarioActorId: usuarioId,
@@ -86,18 +100,28 @@ export async function updateTratamiento(id: string, input: TratamientoInput, usu
     throw new AppError("Tratamiento no encontrado.", 404);
   }
 
-  const actualizado = await prisma.tratamiento.update({
-    where: { id },
-    data: {
-      nombre: input.name,
-      descripcion: input.description,
-      slug: slugify(input.name),
-      precioEstimado: input.precioEstimado ?? null,
-      duracionAproximada: input.duracionAproximada ?? null,
-      activo: input.activo ?? tratamiento.activo,
-      actualizadoPor: usuarioId
+  let actualizado;
+  try {
+    actualizado = await prisma.tratamiento.update({
+      where: { id },
+      data: {
+        nombre: input.name,
+        descripcion: input.description,
+        imagenes: input.imagenes,
+        slug: slugify(input.name),
+        precioEstimado: input.precioEstimado ?? null,
+        duracionAproximada: input.duracionAproximada ?? null,
+        activo: input.activo ?? tratamiento.activo,
+        actualizadoPor: usuarioId
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new AppError("Ya existe otro tratamiento con ese nombre.", 409);
     }
-  });
+
+    throw error;
+  }
 
   await recordRegistroAuditoria({
     usuarioActorId: usuarioId,

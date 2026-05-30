@@ -1,7 +1,8 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 
 import * as appointmentController from "@/controllers/appointment.controller";
-import { authenticate } from "@/middlewares/auth.middleware";
+import { authenticate, optionalAuthenticate } from "@/middlewares/auth.middleware";
 import { authorize } from "@/middlewares/role.middleware";
 import { validate } from "@/middlewares/validate.middleware";
 import { asyncHandler } from "@/utils/async-handler";
@@ -13,6 +14,19 @@ import {
 } from "@/validators/appointment.validator";
 
 const router = Router();
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+const createAppointmentLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: isDevelopment ? 300 : 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    mensaje: "Demasiadas solicitudes de cita desde este origen. Intente mas tarde.",
+    errors: []
+  }
+});
 
 router.get("/", authenticate, asyncHandler(appointmentController.getCitas));
 router.get(
@@ -20,7 +34,13 @@ router.get(
   validate(appointmentAvailabilitySchema),
   asyncHandler(appointmentController.getCitaAvailability)
 );
-router.post("/", validate(appointmentSchema), asyncHandler(appointmentController.createCita));
+router.post(
+  "/",
+  createAppointmentLimiter,
+  optionalAuthenticate,
+  validate(appointmentSchema),
+  asyncHandler(appointmentController.createCita)
+);
 router.get("/:id", authenticate, validate(citaIdSchema), asyncHandler(appointmentController.getCita));
 router.put(
   "/:id",

@@ -24,6 +24,7 @@ export type Tratamiento = {
   name: string;
   slug: string;
   descripcion: string;
+  imagenes: string[];
   precioEstimado?: string | null;
   duracionAproximada?: number | null;
   activo?: boolean;
@@ -65,6 +66,11 @@ export type Cita = {
   origen: string;
   recordatorioEnviado: boolean;
   recordatorioEnviadoEn?: string | null;
+  confirmacionWhatsappEnviada?: boolean;
+  confirmacionWhatsappEnviadaEn?: string | null;
+  recordatorioUnDiaEnviado?: boolean;
+  recordatorioUnDiaEnviadoEn?: string | null;
+  ultimoErrorWhatsapp?: string | null;
   creadoPor?: string | null;
   actualizadoPor?: string | null;
   recordatorio?: {
@@ -91,6 +97,7 @@ export type ConfiguracionClinica = {
   direccion?: string | null;
   horarioAtencion?: string | null;
   urlLogo?: string | null;
+  imagenesNegocio: string[];
   tituloSitio?: string | null;
   descripcionSitio?: string | null;
   fraseEncabezado?: string | null;
@@ -159,9 +166,22 @@ export type AdminUser = {
 };
 
 export type RecordatorioProviderStatus = {
-  proveedor: "MANUAL" | "TWILIO";
+  proveedor: "MANUAL" | "TWILIO" | "WHATSAPP_WEB";
   twilioConfigured: boolean;
-  mode: "REAL" | "FALLBACK_MANUAL";
+  mode: "REAL" | "FALLBACK_MANUAL" | "WHATSAPP_WEB_READY";
+  whatsappWeb?: WhatsappWebStatus;
+};
+
+export type WhatsappWebStatus = {
+  providerEnabled: boolean;
+  autoStart: boolean;
+  state: "disabled" | "disconnected" | "initializing" | "qr" | "ready" | "auth_failure";
+  ready: boolean;
+  hasQr: boolean;
+  qr?: string | null;
+  qrDataUrl?: string | null;
+  lastError?: string | null;
+  sessionPath: string;
 };
 
 export type MensajeConversacionWhatsApp = {
@@ -199,4 +219,9 @@ export type CitaAvailability = {
   duracionAproximada?: number | null;
   occupiedSlots: string[];
   availableSlots: string[];
+};
+
+export type UploadedMedia = {
+  path: string;
+  url: string;
 };

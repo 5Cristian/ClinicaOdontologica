@@ -56,7 +56,7 @@ export async function createRegistroClinico(input: RegistroClinicoInput, usuario
     accion: "CLINICAL_RECORD_CREATE",
     tipoEntidad: "CLINICAL_RECORD",
     entidadId: record.id,
-    descripcion: `Registro clÃ­nico creado para paciente ${record.pacienteId}.`,
+    descripcion: `Registro clinico creado para paciente ${record.pacienteId}.`,
     metadatos: { pacienteId: record.pacienteId, tratamientoId: record.tratamientoId }
   });
 
@@ -86,7 +86,7 @@ export async function getRegistroClinicoById(id: string) {
   });
 
   if (!record) {
-    throw new AppError("Registro clÃ­nico no encontrado.", 404);
+    throw new AppError("Registro clinico no encontrado.", 404);
   }
 
   return mapRegistroClinico(record);
@@ -114,7 +114,7 @@ export async function updateRegistroClinico(id: string, input: RegistroClinicoIn
     accion: "CLINICAL_RECORD_UPDATE",
     tipoEntidad: "CLINICAL_RECORD",
     entidadId: record.id,
-    descripcion: `Registro clÃ­nico actualizado para paciente ${record.pacienteId}.`,
+    descripcion: `Registro clinico actualizado para paciente ${record.pacienteId}.`,
     metadatos: { pacienteId: record.pacienteId, tratamientoId: record.tratamientoId }
   });
 
@@ -130,7 +130,7 @@ export async function deleteRegistroClinico(id: string, usuarioId?: string) {
     accion: "CLINICAL_RECORD_DELETE",
     tipoEntidad: "CLINICAL_RECORD",
     entidadId: record.id,
-    descripcion: `Registro clÃ­nico eliminado para paciente ${record.pacienteId}.`,
+    descripcion: `Registro clinico eliminado para paciente ${record.pacienteId}.`,
     metadatos: { pacienteId: record.pacienteId, tratamientoId: record.tratamientoId }
   });
 }

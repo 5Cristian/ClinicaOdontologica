@@ -40,6 +40,30 @@ router.get(
   asyncHandler(reminderController.getProviderStatus)
 );
 router.get(
+  "/whatsapp-web/status",
+  authenticate,
+  authorize("ADMINISTRADOR"),
+  asyncHandler(reminderController.getWhatsappWebConnectionStatus)
+);
+router.post(
+  "/whatsapp-web/start",
+  authenticate,
+  authorize("ADMINISTRADOR"),
+  asyncHandler(reminderController.startWhatsappWebConnection)
+);
+router.post(
+  "/whatsapp-web/disconnect",
+  authenticate,
+  authorize("ADMINISTRADOR"),
+  asyncHandler(reminderController.disconnectWhatsappWebConnection)
+);
+router.post(
+  "/process-one-day",
+  authenticate,
+  authorize("ADMINISTRADOR"),
+  asyncHandler(reminderController.processOneDayReminders)
+);
+router.get(
   "/pending",
   authenticate,
   authorize("ADMINISTRADOR", "RECEPCION"),

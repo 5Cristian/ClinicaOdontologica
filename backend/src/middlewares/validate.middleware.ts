@@ -9,11 +9,15 @@ export function validate(schema: AnyZodObject) {
     req.query = sanitizeValue(req.query);
     req.params = sanitizeValue(req.params);
 
-    schema.parse({
+    const parsed = schema.parse({
       body: req.body,
       query: req.query,
       params: req.params
     });
+
+    req.body = parsed.body;
+    req.query = parsed.query;
+    req.params = parsed.params;
 
     return next();
   };

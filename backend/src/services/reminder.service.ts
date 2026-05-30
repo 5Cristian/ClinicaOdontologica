@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/config/prisma";
 import { env } from "@/config/env";
 import { getTwilioClient, getTwilioWhatsappFrom } from "@/config/twilio";
+import { getWhatsappWebStatus, sendWhatsappWebMessage } from "@/services/whatsapp.service";
 import { AppError } from "@/utils/app-error";
 
 type PacienteIntent = "CONFIRMADA" | "CANCEL_REQUESTED" | "RESCHEDULE_REQUESTED" | "UNKNOWN";
@@ -27,6 +28,32 @@ function buildRecordatorioMessage(input: {
       .replace("[Hora]", timeLabel) ??
     `Hola ${input.patientName}, le recordamos su cita odontológica en ${input.nombreClinica} el día ${dateLabel} a las ${timeLabel}. Responda CONFIRMO, CANCELAR o REPROGRAMAR.`
   );
+}
+
+function formatAppointmentDateTime(programadaPara: Date) {
+  const dateLabel = new Intl.DateTimeFormat("es-GT", {
+    dateStyle: "full",
+    timeZone: env.REMINDER_TIMEZONE
+  }).format(programadaPara);
+
+  const timeLabel = new Intl.DateTimeFormat("es-GT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: env.REMINDER_TIMEZONE
+  }).format(programadaPara);
+
+  return { dateLabel, timeLabel };
+}
+
+function buildConfirmationMessage(input: { patientName: string; programadaPara: Date }) {
+  const { dateLabel, timeLabel } = formatAppointmentDateTime(input.programadaPara);
+  return `Hola ${input.patientName}, su cita en la clinica odontologica ha sido confirmada para el dia ${dateLabel} a las ${timeLabel}. Por favor presentarse 10 minutos antes. Gracias.`;
+}
+
+function buildOneDayReminderMessage(input: { patientName: string; programadaPara: Date }) {
+  const { dateLabel, timeLabel } = formatAppointmentDateTime(input.programadaPara);
+  return `Hola ${input.patientName}, le recordamos que tiene una cita odontologica programada para manana ${dateLabel} a las ${timeLabel}. Por favor presentarse 10 minutos antes. Gracias.`;
 }
 
 function detectPacienteIntent(body: string): PacienteIntent {
@@ -116,11 +143,18 @@ export async function getRecordatorioProviderStatus() {
   const twilioConfigured = Boolean(
     env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_FROM
   );
+  const whatsappWebStatus = getWhatsappWebStatus();
 
   return {
     proveedor: env.WHATSAPP_PROVIDER,
     twilioConfigured,
-    mode: env.WHATSAPP_PROVIDER === "TWILIO" && twilioConfigured ? "REAL" : "FALLBACK_MANUAL"
+    whatsappWeb: whatsappWebStatus,
+    mode:
+      env.WHATSAPP_PROVIDER === "TWILIO" && twilioConfigured
+        ? "REAL"
+        : env.WHATSAPP_PROVIDER === "WHATSAPP_WEB" && whatsappWebStatus.ready
+          ? "WHATSAPP_WEB_READY"
+          : "FALLBACK_MANUAL"
   };
 }
 
@@ -150,13 +184,39 @@ async function appendConversationMessage(input: {
   });
 }
 
-async function sendWhatsappMessage(telefono: string, mensaje: string) {
+async function sendWhatsappMessage(
+  telefono: string,
+  mensaje: string,
+  options: { allowManualFallback?: boolean } = {}
+) {
+  const allowManualFallback = options.allowManualFallback ?? true;
   const proveedorStatus = await getRecordatorioProviderStatus();
   let proveedor = "MANUAL";
   let sidMensajeProveedor: string | null = null;
   let estadoEntrega = "queued-manual";
 
-  if (proveedorStatus.mode === "REAL") {
+  if (env.WHATSAPP_PROVIDER === "WHATSAPP_WEB") {
+    if (!proveedorStatus.whatsappWeb?.ready) {
+      if (!allowManualFallback) {
+        throw new AppError("WhatsApp Web no esta conectado. Escanee el QR desde configuracion.", 503);
+      }
+
+      estadoEntrega = "fallback-manual-whatsapp-web-disconnected";
+    } else {
+      try {
+        const whatsappWebSend = await sendWhatsappWebMessage(telefono, mensaje);
+        proveedor = "WHATSAPP_WEB";
+        sidMensajeProveedor = whatsappWebSend.providerMessageId;
+        estadoEntrega = whatsappWebSend.status;
+      } catch (error) {
+        if (!allowManualFallback) {
+          throw error;
+        }
+
+        estadoEntrega = "fallback-manual-whatsapp-web-send-failed";
+      }
+    }
+  } else if (proveedorStatus.mode === "REAL") {
     const client = getTwilioClient();
 
     if (!client) {
@@ -183,6 +243,38 @@ async function sendWhatsappMessage(telefono: string, mensaje: string) {
     estadoEntrega,
     whatsappLink: `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`
   };
+}
+
+async function upsertRecordatorioMessage(input: {
+  citaId: string;
+  mensaje: string;
+  proveedor: string;
+  sidMensajeProveedor: string | null;
+  estadoEntrega: string;
+  canal: string;
+  ultimoError?: string | null;
+}) {
+  return prisma.recordatorio.upsert({
+    where: { citaId: input.citaId },
+    update: {
+      mensaje: input.mensaje,
+      proveedor: input.proveedor,
+      sidMensajeProveedor: input.sidMensajeProveedor,
+      estadoEntrega: input.estadoEntrega,
+      ultimoError: input.ultimoError ?? null,
+      enviadoEn: new Date()
+    },
+    create: {
+      citaId: input.citaId,
+      mensaje: input.mensaje,
+      canal: input.canal,
+      proveedor: input.proveedor,
+      sidMensajeProveedor: input.sidMensajeProveedor,
+      estadoEntrega: input.estadoEntrega,
+      ultimoError: input.ultimoError ?? null,
+      enviadoEn: new Date()
+    }
+  });
 }
 
 export async function getCitaConversation(citaId: string) {
@@ -246,26 +338,19 @@ export async function createWhatsappRecordatorio(
   let estadoEntrega = proveedorSend.estadoEntrega;
   let ultimoError: string | null = null;
 
-  const reminder = await prisma.recordatorio.upsert({
-    where: { citaId },
-    update: {
-      mensaje,
-      proveedor,
-      sidMensajeProveedor,
-      estadoEntrega,
-      ultimoError,
-      enviadoEn: new Date()
-    },
-    create: {
-      citaId,
-      mensaje,
-      canal: proveedor === "TWILIO" ? "WHATSAPP_TWILIO" : "WHATSAPP_MANUAL",
-      proveedor,
-      sidMensajeProveedor,
-      estadoEntrega,
-      ultimoError,
-      enviadoEn: new Date()
-    }
+  const reminder = await upsertRecordatorioMessage({
+    citaId,
+    mensaje,
+    proveedor,
+    sidMensajeProveedor,
+    estadoEntrega,
+    ultimoError,
+    canal:
+      proveedor === "TWILIO"
+        ? "WHATSAPP_TWILIO"
+        : proveedor === "WHATSAPP_WEB"
+          ? "WHATSAPP_WEB"
+          : "WHATSAPP_MANUAL"
   });
 
   await prisma.cita.update({
@@ -291,6 +376,235 @@ export async function createWhatsappRecordatorio(
     reminder,
     proveedorMode: proveedorSend.proveedorStatus.mode,
     whatsappLink: proveedorSend.whatsappLink
+  };
+}
+
+export async function sendAppointmentConfirmation(citaId: string, usuarioId?: string) {
+  const appointment = await prisma.cita.findUnique({
+    where: { id: citaId },
+    include: {
+      paciente: true,
+      tratamiento: true
+    }
+  });
+
+  if (!appointment) {
+    throw new AppError("Cita no encontrada.", 404);
+  }
+
+  if (appointment.estado !== EstadoCita.CONFIRMADA) {
+    throw new AppError("Solo se puede enviar confirmacion de citas confirmadas.", 400);
+  }
+
+  if (appointment.confirmacionWhatsappEnviada) {
+    return { skipped: true, reason: "La confirmacion ya fue enviada." };
+  }
+
+  const locked = await prisma.cita.updateMany({
+    where: {
+      id: citaId,
+      confirmacionWhatsappEnviada: false
+    },
+    data: {
+      confirmacionWhatsappEnviada: true,
+      confirmacionWhatsappEnviadaEn: new Date(),
+      ultimoErrorWhatsapp: null,
+      actualizadoPor: usuarioId
+    }
+  });
+
+  if (locked.count === 0) {
+    return { skipped: true, reason: "La confirmacion ya estaba en proceso o enviada." };
+  }
+
+  const telefono = appointment.paciente.whatsapp.replace(/[^\d]/g, "");
+  const mensaje = buildConfirmationMessage({
+    patientName: appointment.paciente.nombreCompleto,
+    programadaPara: appointment.programadaPara
+  });
+
+  try {
+    const proveedorSend = await sendWhatsappMessage(telefono, mensaje, { allowManualFallback: false });
+    const proveedor = proveedorSend.proveedor;
+
+    const reminder = await upsertRecordatorioMessage({
+      citaId,
+      mensaje,
+      proveedor,
+      sidMensajeProveedor: proveedorSend.sidMensajeProveedor,
+      estadoEntrega: proveedorSend.estadoEntrega,
+      canal:
+        proveedor === "TWILIO"
+          ? "WHATSAPP_TWILIO_CONFIRMATION"
+          : proveedor === "WHATSAPP_WEB"
+            ? "WHATSAPP_WEB_CONFIRMATION"
+            : "WHATSAPP_MANUAL_CONFIRMATION"
+    });
+
+    await appendConversationMessage({
+      citaId,
+      direction: "OUTBOUND",
+      cuerpoMensaje: mensaje,
+      proveedor,
+      sidMensajeProveedor: proveedorSend.sidMensajeProveedor,
+      estadoEntrega: proveedorSend.estadoEntrega,
+      enviadoPorUsuarioId: usuarioId
+    });
+
+    return {
+      skipped: false,
+      reminder,
+      proveedorMode: proveedorSend.proveedorStatus.mode,
+      whatsappLink: proveedorSend.whatsappLink
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "No se pudo enviar la confirmacion por WhatsApp.";
+    await prisma.cita.update({
+      where: { id: citaId },
+      data: {
+        confirmacionWhatsappEnviada: false,
+        confirmacionWhatsappEnviadaEn: null,
+        ultimoErrorWhatsapp: errorMessage
+      }
+    });
+    throw error;
+  }
+}
+
+export async function sendOneDayAppointmentReminder(citaId: string) {
+  const appointment = await prisma.cita.findUnique({
+    where: { id: citaId },
+    include: {
+      paciente: true,
+      tratamiento: true
+    }
+  });
+
+  if (!appointment) {
+    throw new AppError("Cita no encontrada.", 404);
+  }
+
+  if (appointment.estado !== EstadoCita.CONFIRMADA) {
+    return { skipped: true, reason: "La cita no esta confirmada." };
+  }
+
+  if (appointment.recordatorioUnDiaEnviado) {
+    return { skipped: true, reason: "El recordatorio de un dia ya fue enviado." };
+  }
+
+  const locked = await prisma.cita.updateMany({
+    where: {
+      id: citaId,
+      recordatorioUnDiaEnviado: false
+    },
+    data: {
+      recordatorioUnDiaEnviado: true,
+      recordatorioUnDiaEnviadoEn: new Date(),
+      ultimoErrorWhatsapp: null
+    }
+  });
+
+  if (locked.count === 0) {
+    return { skipped: true, reason: "El recordatorio ya estaba en proceso o enviado." };
+  }
+
+  const telefono = appointment.paciente.whatsapp.replace(/[^\d]/g, "");
+  const mensaje = buildOneDayReminderMessage({
+    patientName: appointment.paciente.nombreCompleto,
+    programadaPara: appointment.programadaPara
+  });
+
+  try {
+    const proveedorSend = await sendWhatsappMessage(telefono, mensaje, { allowManualFallback: false });
+    const proveedor = proveedorSend.proveedor;
+
+    const reminder = await upsertRecordatorioMessage({
+      citaId,
+      mensaje,
+      proveedor,
+      sidMensajeProveedor: proveedorSend.sidMensajeProveedor,
+      estadoEntrega: proveedorSend.estadoEntrega,
+      canal:
+        proveedor === "TWILIO"
+          ? "WHATSAPP_TWILIO_ONE_DAY_REMINDER"
+          : proveedor === "WHATSAPP_WEB"
+            ? "WHATSAPP_WEB_ONE_DAY_REMINDER"
+            : "WHATSAPP_MANUAL_ONE_DAY_REMINDER"
+    });
+
+    await prisma.cita.update({
+      where: { id: citaId },
+      data: {
+        recordatorioEnviado: true,
+        recordatorioEnviadoEn: new Date()
+      }
+    });
+
+    await appendConversationMessage({
+      citaId,
+      direction: "OUTBOUND",
+      cuerpoMensaje: mensaje,
+      proveedor,
+      sidMensajeProveedor: proveedorSend.sidMensajeProveedor,
+      estadoEntrega: proveedorSend.estadoEntrega
+    });
+
+    return {
+      skipped: false,
+      reminder,
+      proveedorMode: proveedorSend.proveedorStatus.mode,
+      whatsappLink: proveedorSend.whatsappLink
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "No se pudo enviar el recordatorio por WhatsApp.";
+    await prisma.cita.update({
+      where: { id: citaId },
+      data: {
+        recordatorioUnDiaEnviado: false,
+        recordatorioUnDiaEnviadoEn: null,
+        ultimoErrorWhatsapp: errorMessage
+      }
+    });
+    throw error;
+  }
+}
+
+export async function processOneDayAppointmentReminders() {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() + 23 * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+
+  const appointments = await prisma.cita.findMany({
+    where: {
+      estado: EstadoCita.CONFIRMADA,
+      recordatorioUnDiaEnviado: false,
+      programadaPara: {
+        gte: windowStart,
+        lte: windowEnd
+      }
+    },
+    select: { id: true },
+    orderBy: { programadaPara: "asc" }
+  });
+
+  const results: Array<{ citaId: string; success: boolean; error?: string }> = [];
+
+  for (const appointment of appointments) {
+    try {
+      await sendOneDayAppointmentReminder(appointment.id);
+      results.push({ citaId: appointment.id, success: true });
+    } catch (error) {
+      results.push({
+        citaId: appointment.id,
+        success: false,
+        error: error instanceof Error ? error.message : "Error desconocido."
+      });
+    }
+  }
+
+  return {
+    processed: results.length,
+    results
   };
 }
 

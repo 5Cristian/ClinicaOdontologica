@@ -4,6 +4,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "node:path";
 
 import { env } from "@/config/env";
 import { errorHandler, notFoundHandler } from "@/middlewares/error.middleware";
@@ -53,8 +54,9 @@ app.use(
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 // Habilita lectura de cookies para el flujo de refresh token.
 app.use(cookieParser());
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 // Restringe el tamaño del payload para evitar cargas excesivas.
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "6mb" }));
 app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 // Adjunta contexto básico de la petición para auditoría y trazabilidad.
 app.use((req, _res, next) => {

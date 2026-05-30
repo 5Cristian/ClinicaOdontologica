@@ -7,7 +7,6 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <p className="text-sm font-semibold uppercase tracking-[0.25em] text-brand-600">Acceso administrativo</p>
         <h1 className="mt-3 font-heading text-3xl font-bold text-slate-950">Iniciar sesión en la clínica</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">Credenciales iniciales del seed: <strong>admin@clinica.com</strong> / <strong>Admin12345*</strong></p>
         <div className="mt-6"><LoginForm /></div>
       </Card>
     </main>

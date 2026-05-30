@@ -27,7 +27,7 @@ export async function recordRegistroAuditoria(input: AuditInput) {
       JSON.stringify(input.metadatos ?? null)
     );
   } catch (error) {
-    console.error("No se pudo registrar el evento de auditorÃ­a.", error);
+    console.error("No se pudo registrar el evento de auditoria.", error);
   }
 }
 

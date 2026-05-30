@@ -16,6 +16,14 @@ import { CitaAvailability } from "@/types/api";
 
 const PUBLIC_SLOT_TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00"];
 
+function getTodayInputValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function CitaForm({ treatments }: { treatments: Array<{ id: string; name: string }> }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -145,7 +153,7 @@ export function CitaForm({ treatments }: { treatments: Array<{ id: string; name:
           <Input {...form.register("email")} />
         </Field>
         <Field label="Fecha deseada" error={form.formState.errors.programadaParaDate?.message}>
-          <Input {...form.register("programadaParaDate")} type="date" />
+          <Input {...form.register("programadaParaDate")} type="date" min={getTodayInputValue()} />
         </Field>
         <Field label="Tratamiento" error={form.formState.errors.tratamientoId?.message}>
           <Select {...form.register("tratamientoId")}>

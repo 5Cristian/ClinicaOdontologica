@@ -5,11 +5,14 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { ImageManager } from "@/components/admin/image-manager";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { resolveMediaUrl } from "@/lib/media";
 import { treatmentSchema, type TratamientoFormValues } from "@/lib/validations";
 import { createTratamiento, deleteTratamiento, fetchTratamientos, updateTratamiento } from "@/services/admin.service";
 import { Tratamiento } from "@/types/api";
@@ -25,28 +28,38 @@ export default function AdminTratamientosPage() {
   const { token } = useAuth();
   const [treatments, setTratamientos] = useState<Tratamiento[]>([]);
   const [editingTratamiento, setEditingTratamiento] = useState<Tratamiento | null>(null);
+  const [treatmentImages, setTreatmentImages] = useState<string[]>([]);
+  const [persistedTreatmentImages, setPersistedTreatmentImages] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const { showToast } = useToast();
   const form = useForm<TratamientoFormValues>({
     resolver: zodResolver(treatmentSchema),
     defaultValues: emptyTratamientoForm
   });
 
-  // Refresca el catálogo visible para administración y sitio público.
   async function loadData() {
-    setTratamientos(await fetchTratamientos(token ?? undefined));
+    try {
+      setTratamientos(await fetchTratamientos(token ?? undefined));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudieron cargar los tratamientos.";
+      showToast(message, "error");
+    }
   }
 
   useEffect(() => {
     void loadData();
   }, [token]);
 
-  // Rellena el formulario cuando se selecciona un tratamiento para edición.
   useEffect(() => {
     if (!editingTratamiento) {
+      setPersistedTreatmentImages([]);
+      setTreatmentImages([]);
       form.reset(emptyTratamientoForm);
       return;
     }
 
+    setPersistedTreatmentImages(editingTratamiento.imagenes ?? []);
+    setTreatmentImages(editingTratamiento.imagenes ?? []);
     form.reset({
       name: editingTratamiento.name,
       descripcion: editingTratamiento.descripcion,
@@ -55,28 +68,38 @@ export default function AdminTratamientosPage() {
     });
   }, [editingTratamiento, form]);
 
-  // Crea o actualiza el tratamiento según el modo actual del formulario.
   async function onSubmit(values: TratamientoFormValues) {
     if (!token) return;
 
     const payload = {
       name: values.name,
       description: values.descripcion,
+      imagenes: treatmentImages,
       precioEstimado: values.precioEstimado ? Number(values.precioEstimado) : null,
       duracionAproximada: values.duracionAproximada ? Number(values.duracionAproximada) : null
     };
 
-    if (editingTratamiento) {
-      await updateTratamiento(token, editingTratamiento.id, payload);
-      setFeedback("Tratamiento actualizado correctamente.");
-    } else {
-      await createTratamiento(token, payload);
-      setFeedback("Tratamiento creado correctamente.");
-    }
+    try {
+      if (editingTratamiento) {
+        await updateTratamiento(token, editingTratamiento.id, payload);
+        setFeedback("Tratamiento actualizado correctamente.");
+        showToast("Tratamiento actualizado correctamente.", "success");
+      } else {
+        await createTratamiento(token, payload);
+        setFeedback("Tratamiento creado correctamente.");
+        showToast("Tratamiento creado correctamente.", "success");
+      }
 
-    setEditingTratamiento(null);
-    form.reset(emptyTratamientoForm);
-    await loadData();
+      setEditingTratamiento(null);
+      setPersistedTreatmentImages([]);
+      setTreatmentImages([]);
+      form.reset(emptyTratamientoForm);
+      await loadData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo guardar el tratamiento.";
+      setFeedback(null);
+      showToast(message, "error");
+    }
   }
 
   return (
@@ -88,7 +111,7 @@ export default function AdminTratamientosPage() {
               {editingTratamiento ? "Editar tratamiento" : "Nuevo tratamiento"}
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Mantén actualizado el catálogo clínico que usan recepción, odontología y el sitio público.
+              Mantiene actualizado el catalogo clinico que usan recepcion, odontologia y el sitio publico.
             </p>
           </div>
           {editingTratamiento ? (
@@ -96,10 +119,12 @@ export default function AdminTratamientosPage() {
               variant="secondary"
               onClick={() => {
                 setEditingTratamiento(null);
+                setPersistedTreatmentImages([]);
+                setTreatmentImages([]);
                 form.reset(emptyTratamientoForm);
               }}
             >
-              Cancelar edición
+              Cancelar edicion
             </Button>
           ) : null}
         </div>
@@ -112,11 +137,23 @@ export default function AdminTratamientosPage() {
             <Input {...form.register("precioEstimado")} placeholder="Precio estimado" />
           </Field>
           <Field className="md:col-span-2" error={form.formState.errors.descripcion?.message}>
-            <Textarea {...form.register("descripcion")} placeholder="Descripción" />
+            <Textarea {...form.register("descripcion")} placeholder="Descripcion" />
           </Field>
           <Field error={form.formState.errors.duracionAproximada?.message}>
-            <Input {...form.register("duracionAproximada")} placeholder="Duración aproximada en minutos" />
+            <Input {...form.register("duracionAproximada")} placeholder="Duracion aproximada en minutos" />
           </Field>
+          <div className="md:col-span-2">
+            <ImageManager
+              token={token}
+              category="treatments"
+              images={treatmentImages}
+              protectedImages={persistedTreatmentImages}
+              onChange={setTreatmentImages}
+              maxImages={12}
+              title="Galeria del tratamiento"
+              helperText="Sube fotos del procedimiento, resultados referenciales o imagenes explicativas."
+            />
+          </div>
           <div className="md:col-span-2 flex flex-wrap gap-3">
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {editingTratamiento ? "Actualizar tratamiento" : "Guardar tratamiento"}
@@ -132,8 +169,16 @@ export default function AdminTratamientosPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {treatments.map((treatment) => (
             <div key={treatment.id} className="rounded-2xl border border-slate-200 p-5">
+              {treatment.imagenes?.[0] ? (
+                <img
+                  src={resolveMediaUrl(treatment.imagenes[0])}
+                  alt={treatment.name}
+                  className="mb-4 h-40 w-full rounded-2xl object-cover"
+                />
+              ) : null}
               <p className="font-semibold text-slate-900">{treatment.name}</p>
               <p className="mt-2 text-sm text-slate-600">{treatment.descripcion}</p>
+              <p className="mt-2 text-xs text-slate-500">{treatment.imagenes?.length ?? 0} imagenes vinculadas</p>
               <div className="mt-3 text-xs text-slate-500">
                 <p>Creado: {treatment.creadoEn ? new Date(treatment.creadoEn).toLocaleString() : "N/D"}</p>
                 <p>Actualizado: {treatment.actualizadoEn ? new Date(treatment.actualizadoEn).toLocaleString() : "N/D"}</p>
@@ -146,12 +191,20 @@ export default function AdminTratamientosPage() {
                   variant="danger"
                   onClick={async () => {
                     if (!token) return;
-                    await deleteTratamiento(token, treatment.id);
-                    if (editingTratamiento?.id === treatment.id) {
-                      setEditingTratamiento(null);
-                      form.reset(emptyTratamientoForm);
+                    try {
+                      await deleteTratamiento(token, treatment.id);
+                      showToast("Tratamiento eliminado correctamente.", "success");
+                      if (editingTratamiento?.id === treatment.id) {
+                        setEditingTratamiento(null);
+                        setPersistedTreatmentImages([]);
+                        setTreatmentImages([]);
+                        form.reset(emptyTratamientoForm);
+                      }
+                      await loadData();
+                    } catch (error) {
+                      const message = error instanceof Error ? error.message : "No se pudo eliminar el tratamiento.";
+                      showToast(message, "error");
                     }
-                    await loadData();
                   }}
                 >
                   Eliminar

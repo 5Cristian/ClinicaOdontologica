@@ -228,6 +228,32 @@ export default function AdminCitasPage() {
     setOpenConversationId(citaId);
   }
 
+  function showWhatsappFeedback(result: {
+    proveedorMode?: string;
+    reminder?: { proveedor?: string; estadoEntrega?: string | null };
+    skipped?: boolean;
+    reason?: string;
+  }) {
+    if (result.skipped) {
+      setFeedback(result.reason ?? "No fue necesario enviar otro mensaje de WhatsApp.");
+      return;
+    }
+
+    const provider = result.reminder?.proveedor ?? "MANUAL";
+    const status = result.reminder?.estadoEntrega ?? result.proveedorMode ?? "";
+
+    if (provider === "WHATSAPP_WEB") {
+      setFeedback("Mensaje enviado automaticamente por WhatsApp Web.");
+      return;
+    }
+
+    setFeedback(
+      status.includes("fallback")
+        ? "No se pudo enviar automaticamente. Revise que WhatsApp Web este conectado y que el numero tenga codigo de pais."
+        : "Recordatorio registrado correctamente."
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -422,7 +448,7 @@ export default function AdminCitasPage() {
                     onClick={async () => {
                       if (!token) return;
                       const data = await sendRecordatorio(token, appointment.id);
-                      window.open(data.whatsappLink, "_blank");
+                      showWhatsappFeedback(data);
                       await loadData();
                     }}
                   >
@@ -448,7 +474,7 @@ export default function AdminCitasPage() {
                       const data = mensaje
                         ? await sendCustomRecordatorio(token, appointment.id, mensaje)
                         : await sendRecordatorio(token, appointment.id);
-                      window.open(data.whatsappLink, "_blank");
+                      showWhatsappFeedback(data);
                       await loadData();
                     }}
                   >
@@ -522,9 +548,7 @@ export default function AdminCitasPage() {
                       const mensaje = replyMessages[appointment.id]?.trim();
                       if (!mensaje) return;
                       const data = await enviarRespuestaManual(token, appointment.id, mensaje);
-                      if (data.proveedorMode !== "REAL") {
-                        window.open(data.whatsappLink, "_blank");
-                      }
+                      showWhatsappFeedback(data);
                       await loadData();
                     }}
                   >
@@ -606,7 +630,7 @@ export default function AdminCitasPage() {
                           onClick={async () => {
                             if (!token) return;
                             const data = await sendRecordatorio(token, appointment.id);
-                            window.open(data.whatsappLink, "_blank");
+                            showWhatsappFeedback(data);
                             await loadData();
                           }}
                         >

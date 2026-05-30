@@ -14,10 +14,16 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url(),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(8).max(14).default(10),
   APP_BASE_URL: z.string().url().default("http://localhost:4000"),
-  WHATSAPP_PROVIDER: z.enum(["MANUAL", "TWILIO"]).default("MANUAL"),
+  WHATSAPP_PROVIDER: z.enum(["MANUAL", "TWILIO", "WHATSAPP_WEB"]).default("MANUAL"),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_WHATSAPP_FROM: z.string().optional()
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
+  WHATSAPP_WEB_SESSION_PATH: z.string().default(".wwebjs_auth"),
+  WHATSAPP_WEB_CHROME_PATH: z.string().optional(),
+  WHATSAPP_WEB_AUTO_START: z.enum(["true", "false"]).default("false"),
+  WHATSAPP_DEFAULT_COUNTRY_CODE: z.string().regex(/^\d{1,4}$/).default("502"),
+  REMINDER_CRON_EXPRESSION: z.string().default("*/15 * * * *"),
+  REMINDER_TIMEZONE: z.string().default("America/Guatemala")
 });
 
 export const env = envSchema.parse(process.env);

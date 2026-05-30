@@ -50,6 +50,19 @@ TWILIO_AUTH_TOKEN=""
 TWILIO_WHATSAPP_FROM="whatsapp:+14155238886"
 ```
 
+Variables para WhatsApp Web local:
+
+```env
+WHATSAPP_PROVIDER="WHATSAPP_WEB"
+WHATSAPP_WEB_SESSION_PATH=".wwebjs_auth"
+WHATSAPP_WEB_CHROME_PATH=""
+WHATSAPP_WEB_AUTO_START="false"
+REMINDER_CRON_EXPRESSION="*/15 * * * *"
+REMINDER_TIMEZONE="America/Guatemala"
+```
+
+`WHATSAPP_WEB_SESSION_PATH` guarda la sesion local generada al escanear el QR. No debe subirse al repositorio.
+
 ### Base de datos
 
 ```bash
@@ -96,18 +109,22 @@ Backend disponible en `http://localhost:4000`.
 - `GET /api/patients/:id`
 - `PUT /api/patients/:id`
 - `DELETE /api/patients/:id`
-- `GET /api/appointments`
-- `POST /api/appointments`
-- `GET /api/appointments/:id`
-- `PUT /api/appointments/:id`
-- `PATCH /api/appointments/:id/status`
-- `DELETE /api/appointments/:id`
+- `GET /api/citas`
+- `POST /api/citas`
+- `GET /api/citas/:id`
+- `PUT /api/citas/:id`
+- `PATCH /api/citas/:id/status`
+- `DELETE /api/citas/:id`
 - `GET /api/treatments`
 - `POST /api/treatments`
 - `PUT /api/treatments/:id`
 - `DELETE /api/treatments/:id`
-- `POST /api/reminders/whatsapp/:appointmentId`
-- `GET /api/reminders/provider-status`
+- `POST /api/reminders/whatsapp/:citaId`
+- `GET /api/reminders/proveedor-status`
+- `GET /api/reminders/whatsapp-web/status`
+- `POST /api/reminders/whatsapp-web/start`
+- `POST /api/reminders/whatsapp-web/disconnect`
+- `POST /api/reminders/process-one-day`
 - `POST /api/webhooks/twilio/whatsapp/status`
 - `POST /api/webhooks/twilio/whatsapp/inbound`
 
@@ -117,7 +134,7 @@ Backend disponible en `http://localhost:4000`.
 - Rotación de sesión con `refresh token` persistido y cookie `HttpOnly`.
 - Integración opcional con `Twilio WhatsApp` para envío real y webhook bidireccional.
 - Contraseñas con `bcrypt`.
-- Roles: `ADMIN`, `RECEPCION`, `ODONTOLOGO`.
+- Roles: `ADMINISTRADOR`, `RECEPCION`, `ODONTOLOGO`.
 - Validaciones con `Zod`.
 - Sanitización básica de entradas.
 - `Helmet`.

@@ -38,6 +38,9 @@ pnpm-debug.log*
 *.pid.lock
 tmp/
 temp/
+backend/uploads/
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
 
 # Local databases
 *.sqlite

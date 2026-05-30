@@ -80,6 +80,7 @@ model Tratamiento {
   nombre             String            @unique
   slug               String            @unique
   descripcion        String
+  imagenes           String[]          @default([])
   precioEstimado     Decimal?          @db.Decimal(10, 2)
   duracionAproximada Int?
   activo             Boolean           @default(true)
@@ -104,6 +105,11 @@ model Cita {
   origen                 String                     @default("FORMULARIO_PUBLICO")
   recordatorioEnviado    Boolean                    @default(false)
   recordatorioEnviadoEn  DateTime?
+  confirmacionWhatsappEnviada Boolean                @default(false)
+  confirmacionWhatsappEnviadaEn DateTime?
+  recordatorioUnDiaEnviado Boolean                   @default(false)
+  recordatorioUnDiaEnviadoEn DateTime?
+  ultimoErrorWhatsapp    String?
   recordatorio           Recordatorio?
   mensajesWhatsapp       MensajeConversacionWhatsApp[]
   creadoPor              String?
@@ -178,6 +184,7 @@ model ConfiguracionClinica {
   direccion                   String?
   horarioAtencion             String?
   urlLogo                     String?
+  imagenesNegocio             String[]  @default([])
   tituloSitio                 String?
   descripcionSitio            String?
   fraseEncabezado             String?

@@ -1,15 +1,19 @@
 import { z } from "zod";
 
+const mediaRefSchema = z
+  .string()
+  .refine((value) => !value || value.startsWith("/uploads/") || /^https?:\/\//.test(value), "URL invalida");
+
 export const loginSchema = z.object({
-  email: z.string().email("Correo inválido"),
-  password: z.string().min(8, "Ingrese una contraseña válida")
+  email: z.string().email("Correo invalido"),
+  password: z.string().min(8, "Ingrese una contrasena valida")
 });
 
 export const appointmentFormSchema = z.object({
   nombreCompleto: z.string().min(3, "Ingrese el nombre completo"),
-  telefono: z.string().min(8, "Ingrese un teléfono válido"),
-  whatsapp: z.string().min(8, "Ingrese un WhatsApp válido"),
-  email: z.string().email("Correo inválido").optional().or(z.literal("")),
+  telefono: z.string().min(8, "Ingrese un telefono valido"),
+  whatsapp: z.string().min(8, "Ingrese un WhatsApp valido"),
+  email: z.string().email("Correo invalido").optional().or(z.literal("")),
   tratamientoId: z.string().min(1, "Seleccione un tratamiento"),
   programadaParaDate: z.string().min(1, "Seleccione una fecha"),
   programadaParaTime: z.string().min(1, "Seleccione una hora"),
@@ -47,7 +51,7 @@ export const adminCitaSchema = z.object({
 export const clinicalRecordSchema = z.object({
   pacienteId: z.string().min(1, "Seleccione un paciente"),
   tratamientoId: z.string().optional().or(z.literal("")),
-  diagnosis: z.string().min(5, "Ingrese un diagnóstico"),
+  diagnosis: z.string().min(5, "Ingrese un diagnostico"),
   piezaDental: z.string().optional().or(z.literal("")),
   medicamentos: z.string().optional().or(z.literal("")),
   notas: z.string().optional().or(z.literal("")),
@@ -55,21 +59,35 @@ export const clinicalRecordSchema = z.object({
 });
 
 export const clinicConfigSchema = z.object({
-  nombreClinica: z.string().min(3, "Ingrese el nombre de la clínica"),
-  telefono: z.string().min(8, "Ingrese un teléfono válido"),
-  whatsapp: z.string().min(8, "Ingrese un WhatsApp válido"),
+  nombreClinica: z.string().min(3, "Ingrese el nombre de la clinica"),
+  telefono: z.string().min(8, "Ingrese un telefono valido"),
+  whatsapp: z.string().min(8, "Ingrese un WhatsApp valido"),
   direccion: z.string().optional().or(z.literal("")),
   horarioAtencion: z.string().optional().or(z.literal("")),
-  urlLogo: z.string().url("URL inválida").optional().or(z.literal("")),
-  urlFacebook: z.string().url("URL inválida").optional().or(z.literal("")),
-  urlInstagram: z.string().url("URL inválida").optional().or(z.literal("")),
-  mensajeWhatsappPredeterminado: z.string().optional().or(z.literal(""))
+  urlLogo: mediaRefSchema.optional().or(z.literal("")),
+  tituloSitio: z.string().max(160).optional().or(z.literal("")),
+  descripcionSitio: z.string().max(255).optional().or(z.literal("")),
+  fraseEncabezado: z.string().max(160).optional().or(z.literal("")),
+  textoInsigniaHero: z.string().max(120).optional().or(z.literal("")),
+  tituloHero: z.string().max(200).optional().or(z.literal("")),
+  descripcionHero: z.string().max(500).optional().or(z.literal("")),
+  tituloPaginaServicios: z.string().max(200).optional().or(z.literal("")),
+  descripcionPaginaServicios: z.string().max(500).optional().or(z.literal("")),
+  tituloPaginaReservas: z.string().max(200).optional().or(z.literal("")),
+  descripcionPaginaReservas: z.string().max(500).optional().or(z.literal("")),
+  tituloPaginaContacto: z.string().max(200).optional().or(z.literal("")),
+  descripcionPaginaContacto: z.string().max(500).optional().or(z.literal("")),
+  tituloPie: z.string().max(160).optional().or(z.literal("")),
+  descripcionPie: z.string().max(255).optional().or(z.literal("")),
+  urlFacebook: z.string().url("URL invalida").optional().or(z.literal("")),
+  urlInstagram: z.string().url("URL invalida").optional().or(z.literal("")),
+  mensajeWhatsappPredeterminado: z.string().max(500).optional().or(z.literal(""))
 });
 
 export const adminUserSchema = z.object({
   name: z.string().min(3, "Ingrese el nombre completo"),
-  email: z.string().email("Correo inválido"),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres").optional().or(z.literal("")),
+  email: z.string().email("Correo invalido"),
+  password: z.string().min(8, "La contrasena debe tener al menos 8 caracteres").optional().or(z.literal("")),
   role: z.enum(["ADMINISTRADOR", "RECEPCION", "ODONTOLOGO"]),
   activo: z.boolean()
 });

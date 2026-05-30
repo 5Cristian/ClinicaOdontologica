@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 
 import * as reminderService from "@/services/reminder.service";
+import {
+  disconnectWhatsappWebClient,
+  getWhatsappWebStatus,
+  initializeWhatsappWebClient
+} from "@/services/whatsapp.service";
 import { successResponse } from "@/utils/api-response";
 
 export async function getProviderStatus(_req: Request, res: Response) {
@@ -39,6 +44,26 @@ export async function enviarRespuestaManual(req: Request, res: Response) {
   const mensaje = String(req.body?.mensaje ?? "");
   const data = await reminderService.sendManualWhatsappReply(citaId, mensaje, req.user?.id);
   return res.json(successResponse("Respuesta enviada correctamente.", data));
+}
+
+export async function getWhatsappWebConnectionStatus(_req: Request, res: Response) {
+  const data = getWhatsappWebStatus();
+  return res.json(successResponse("Estado de WhatsApp Web obtenido correctamente.", data));
+}
+
+export async function startWhatsappWebConnection(_req: Request, res: Response) {
+  const data = await initializeWhatsappWebClient();
+  return res.json(successResponse("Conexion de WhatsApp Web iniciada correctamente.", data));
+}
+
+export async function disconnectWhatsappWebConnection(_req: Request, res: Response) {
+  const data = await disconnectWhatsappWebClient();
+  return res.json(successResponse("Conexion de WhatsApp Web cerrada correctamente.", data));
+}
+
+export async function processOneDayReminders(_req: Request, res: Response) {
+  const data = await reminderService.processOneDayAppointmentReminders();
+  return res.json(successResponse("Proceso de recordatorios ejecutado correctamente.", data));
 }
 
 export async function handleTwilioStatusWebhook(req: Request, res: Response) {

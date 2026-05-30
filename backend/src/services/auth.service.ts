@@ -78,12 +78,12 @@ export async function login(email: string, password: string) {
   const usuario = await prisma.usuario.findUnique({ where: { correo: email } });
 
   if (!usuario || !usuario.activo) {
-    throw new AppError("Credenciales invÃ¡lidas.", 401);
+    throw new AppError("Credenciales invalidas.", 401);
   }
 
   const passwordMatches = await comparePassword(password, usuario.hashContrasena);
   if (!passwordMatches) {
-    throw new AppError("Credenciales invÃ¡lidas.", 401);
+    throw new AppError("Credenciales invalidas.", 401);
   }
 
   await recordRegistroAuditoria({
@@ -91,7 +91,7 @@ export async function login(email: string, password: string) {
     accion: "AUTH_LOGIN",
     tipoEntidad: "AUTH",
     entidadId: usuario.id,
-    descripcion: `Inicio de sesiÃ³n exitoso para ${usuario.correo}.`,
+    descripcion: `Inicio de sesion exitoso para ${usuario.correo}.`,
     metadatos: { correo: usuario.correo, rol: usuario.rol }
   });
 
@@ -101,7 +101,7 @@ export async function login(email: string, password: string) {
 export async function refreshSession(combinedTokenRefresco: string) {
   const parts = combinedTokenRefresco.split(".");
   if (parts.length < 3) {
-    throw new AppError("Refresh token invÃ¡lido.", 401);
+    throw new AppError("Refresh token invalido.", 401);
   }
 
   const payload = verifyTokenRefresco(parts.slice(0, 3).join("."));
@@ -123,12 +123,12 @@ export async function refreshSession(combinedTokenRefresco: string) {
   }
 
   if (!matchedTokenId) {
-    throw new AppError("Refresh token invÃ¡lido.", 401);
+    throw new AppError("Refresh token invalido.", 401);
   }
 
   const usuario = await prisma.usuario.findUnique({ where: { id: payload.id } });
   if (!usuario || !usuario.activo) {
-    throw new AppError("Usuario no autorizado para renovar sesiÃ³n.", 401);
+    throw new AppError("Usuario no autorizado para renovar sesion.", 401);
   }
 
   await prisma.tokenRefresco.update({
@@ -160,7 +160,7 @@ export async function logout(combinedTokenRefresco?: string) {
       accion: "AUTH_LOGOUT",
       tipoEntidad: "AUTH",
       entidadId: token.usuarioId,
-      descripcion: "Cierre de sesiÃ³n registrado correctamente."
+      descripcion: "Cierre de sesion registrado correctamente."
     });
     break;
   }

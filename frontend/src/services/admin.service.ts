@@ -10,7 +10,9 @@ import {
   RecordatorioProviderStatus,
   ReportSummary,
   Tratamiento,
-  MensajeConversacionWhatsApp
+  MensajeConversacionWhatsApp,
+  UploadedMedia,
+  WhatsappWebStatus
 } from "@/types/api";
 
 // Obtiene el listado completo de pacientes para la gestión administrativa.
@@ -64,10 +66,21 @@ export async function deleteCita(token: string, id: string) {
   return apiRequest(`/citas/${id}`, { method: "DELETE", token });
 }
 
-// Genera el recordatorio de WhatsApp y devuelve el enlace para abrirlo.
+type WhatsappSendResult = {
+  whatsappLink?: string;
+  proveedorMode?: string;
+  reminder?: {
+    proveedor?: string;
+    estadoEntrega?: string | null;
+  };
+  skipped?: boolean;
+  reason?: string;
+};
+
+// Genera el recordatorio de WhatsApp.
 export async function sendRecordatorio(token: string, citaId: string) {
   return (
-    await apiRequest<{ whatsappLink: string }>(`/reminders/whatsapp/${citaId}`, {
+    await apiRequest<WhatsappSendResult>(`/reminders/whatsapp/${citaId}`, {
       method: "POST",
       token
     })
@@ -77,7 +90,7 @@ export async function sendRecordatorio(token: string, citaId: string) {
 // Envía un recordatorio con mensaje manual personalizado.
 export async function sendCustomRecordatorio(token: string, citaId: string, mensaje: string) {
   return (
-    await apiRequest<{ whatsappLink: string }>(`/reminders/whatsapp/${citaId}`, {
+    await apiRequest<WhatsappSendResult>(`/reminders/whatsapp/${citaId}`, {
       method: "POST",
       token,
       body: JSON.stringify({ mensaje })
@@ -109,10 +122,34 @@ export async function fetchRecordatorioProviderStatus(token: string) {
   return (await apiRequest<RecordatorioProviderStatus>("/reminders/proveedor-status", { token })).data;
 }
 
+export async function fetchWhatsappWebStatus(token: string) {
+  return (await apiRequest<WhatsappWebStatus>("/reminders/whatsapp-web/status", { token })).data;
+}
+
+export async function startWhatsappWeb(token: string) {
+  return (
+    await apiRequest<WhatsappWebStatus>("/reminders/whatsapp-web/start", {
+      method: "POST",
+      token,
+      body: JSON.stringify({})
+    })
+  ).data;
+}
+
+export async function disconnectWhatsappWeb(token: string) {
+  return (
+    await apiRequest<WhatsappWebStatus>("/reminders/whatsapp-web/disconnect", {
+      method: "POST",
+      token,
+      body: JSON.stringify({})
+    })
+  ).data;
+}
+
 // Envía una respuesta manual desde el panel al paciente.
 export async function enviarRespuestaManual(token: string, citaId: string, mensaje: string) {
   return (
-    await apiRequest<{ whatsappLink: string; proveedorMode: "REAL" | "FALLBACK_MANUAL" }>(
+    await apiRequest<WhatsappSendResult>(
       `/reminders/reply/${citaId}`,
       {
         method: "POST",
@@ -161,6 +198,27 @@ export async function updateConfiguracionClinica(token: string, payload: Record<
       body: JSON.stringify(payload)
     })
   ).data;
+}
+
+export async function uploadAdminImage(
+  token: string,
+  payload: { category: "treatments" | "clinic"; fileName: string; mimeType: string; dataBase64: string }
+) {
+  return (
+    await apiRequest<UploadedMedia>("/media/images", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload)
+    })
+  ).data;
+}
+
+export async function deleteAdminImage(token: string, path: string) {
+  return apiRequest("/media/images", {
+    method: "DELETE",
+    token,
+    body: JSON.stringify({ path })
+  });
 }
 
 // Obtiene el historial clínico completo o filtrado por paciente.

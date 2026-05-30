@@ -2,7 +2,11 @@ import { EstadoCita } from "@prisma/client";
 
 import { prisma } from "@/config/prisma";
 import { recordRegistroAuditoria } from "@/services/audit-log.service";
-import { createWhatsappRecordatorio, getRecordatorioProviderStatus } from "@/services/reminder.service";
+import {
+  createWhatsappRecordatorio,
+  getRecordatorioProviderStatus,
+  sendAppointmentConfirmation
+} from "@/services/reminder.service";
 import { AppError } from "@/utils/app-error";
 
 type CitaInput = {
@@ -20,6 +24,7 @@ type CitaInput = {
 
 const CLINIC_TIMEZONE_OFFSET = "-06:00";
 const PUBLIC_SLOT_TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00"];
+const PUBLIC_MAX_ADVANCE_DAYS = 90;
 
 async function ensureUniqueSlot(programadaPara: Date, excludeId?: string) {
   // Evita que dos citas activas compartan el mismo horario.
@@ -40,6 +45,41 @@ async function ensureUniqueSlot(programadaPara: Date, excludeId?: string) {
 
 function buildClinicDateTime(date: string, time: string) {
   return new Date(`${date}T${time}:00${CLINIC_TIMEZONE_OFFSET}`);
+}
+
+function parseClinicSlot(value: string) {
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+  if (!match) {
+    throw new AppError("Fecha y hora de cita invalidas.", 400);
+  }
+
+  return {
+    date: match[1],
+    time: `${match[2]}:${match[3]}`
+  };
+}
+
+function validateProgramadaPara(programadaPara: Date) {
+  if (Number.isNaN(programadaPara.getTime())) {
+    throw new AppError("Fecha y hora de cita invalidas.", 400);
+  }
+}
+
+function validatePublicAppointmentRules(input: CitaInput, programadaPara: Date) {
+  const { time } = parseClinicSlot(input.programadaPara);
+  const maxAdvance = new Date(Date.now() + PUBLIC_MAX_ADVANCE_DAYS * 24 * 60 * 60 * 1000);
+
+  if (programadaPara <= new Date()) {
+    throw new AppError("La cita debe programarse para una fecha y hora futura.", 400);
+  }
+
+  if (programadaPara > maxAdvance) {
+    throw new AppError(`La reserva publica solo permite fechas dentro de los proximos ${PUBLIC_MAX_ADVANCE_DAYS} dias.`, 400);
+  }
+
+  if (!PUBLIC_SLOT_TIMES.includes(time)) {
+    throw new AppError("La hora seleccionada no esta dentro del horario publico de reservas.", 400);
+  }
 }
 
 function getRequiredSlots(durationMinutes?: number | null) {
@@ -124,6 +164,14 @@ export async function obtenerHorariosDisponibles(date: string, tratamientoId?: s
       })
     : null;
 
+  if (tratamientoId && (!treatment || !treatment.activo)) {
+    throw new AppError("Tratamiento no disponible para reserva.", 404);
+  }
+
+  if (buildClinicDateTime(date, "23:59") <= new Date()) {
+    throw new AppError("No se puede consultar disponibilidad de fechas pasadas.", 400);
+  }
+
   const requiredSlots = getRequiredSlots(treatment?.duracionAproximada);
   const dayStart = buildClinicDateTime(date, "00:00");
   const dayEnd = buildClinicDateTime(date, "23:59");
@@ -179,6 +227,20 @@ export async function obtenerHorariosDisponibles(date: string, tratamientoId?: s
 
 export async function createCita(input: CitaInput, usuarioId?: string) {
   const programadaPara = new Date(input.programadaPara);
+  validateProgramadaPara(programadaPara);
+
+  const treatment = await prisma.tratamiento.findUnique({
+    where: { id: input.tratamientoId }
+  });
+
+  if (!treatment || !treatment.activo) {
+    throw new AppError("Tratamiento no disponible para reserva.", 404);
+  }
+
+  if (!usuarioId) {
+    validatePublicAppointmentRules(input, programadaPara);
+  }
+
   await ensureUniqueSlot(programadaPara);
   const patient = await resolvePaciente(input, usuarioId);
 
@@ -248,6 +310,16 @@ export async function getCitaById(id: string) {
 export async function updateCita(id: string, input: CitaInput, usuarioId?: string) {
   await getCitaById(id);
   const programadaPara = new Date(input.programadaPara);
+  validateProgramadaPara(programadaPara);
+
+  const treatment = await prisma.tratamiento.findUnique({
+    where: { id: input.tratamientoId }
+  });
+
+  if (!treatment || !treatment.activo) {
+    throw new AppError("Tratamiento no disponible para reserva.", 404);
+  }
+
   await ensureUniqueSlot(programadaPara, id);
   const patient = await resolvePaciente(input, usuarioId);
 
@@ -306,6 +378,14 @@ export async function updateEstadoCita(id: string, estado: EstadoCita, usuarioId
     descripcion: `Estado de cita cambiado de ${current.estado} a ${estado}.`,
     metadatos: { previousStatus: current.estado, nextStatus: estado }
   });
+
+  if (estado === EstadoCita.CONFIRMADA && current.estado !== EstadoCita.CONFIRMADA) {
+    try {
+      await sendAppointmentConfirmation(id, usuarioId);
+    } catch (error) {
+      console.error("No se pudo enviar la confirmacion automatica de la cita.", error);
+    }
+  }
 
   return appointment;
 }

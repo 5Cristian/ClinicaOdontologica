@@ -17,8 +17,8 @@ export function LoginForm() {
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "admin@clinica.com",
-      password: "Admin12345*"
+      email: "",
+      password: ""
     }
   });
 

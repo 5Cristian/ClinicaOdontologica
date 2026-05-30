@@ -5,6 +5,7 @@ import auditLogRoutes from "@/routes/audit-log.routes";
 import authRoutes from "@/routes/auth.routes";
 import clinicalRecordRoutes from "@/routes/clinical-record.routes";
 import clinicConfigRoutes from "@/routes/clinic-config.routes";
+import mediaRoutes from "@/routes/media.routes";
 import patientRoutes from "@/routes/patient.routes";
 import reportRoutes from "@/routes/report.routes";
 import reminderRoutes from "@/routes/reminder.routes";
@@ -24,6 +25,7 @@ router.use("/reports", reportRoutes);
 router.use("/clinical-records", clinicalRecordRoutes);
 router.use("/reminders", reminderRoutes);
 router.use("/clinic-config", clinicConfigRoutes);
+router.use("/media", mediaRoutes);
 router.use("/webhooks", webhookRoutes);
 
 export default router;
